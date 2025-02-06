@@ -27,17 +27,49 @@ RUN apt update && apt install -y \
     libpoco-dev \
     libtinyxml2-dev \
     pkg-config \
-    liblog4cxx-dev
+    liblog4cxx-dev \
+    git \
+    fd-find \
+    python-is-python3 \
+    qtbase5-dev \
+    qt5-qmake \
+    libgraphviz-dev \
+    python3-dev \
+    python3-sip
 
 # Install pip packages
-WORKDIR /build
-RUN pip install --break-system-packages rosdep rosinstall_generator vcstool
+RUN pip install --break-system-packages \
+    rosdep \
+    rosinstall_generator \
+    vcstool \
+    bloom \
+    sip \
+    pyqt5 \
+    pygraphviz \
+    pydot \
+    catkin-tools-python \
+    colcon-common-extensions
+
+# Install patches
+WORKDIR /patches
+RUN git clone https://github.com/RoboStack/ros-noetic.git
+RUN cd ros-noetic && git checkout 330ac1d36e6410683c039fbad4b60b60a61c8b6b
 
 # Build ROS
+WORKDIR /build
 RUN rosdep init && rosdep update
 RUN rosinstall_generator desktop --rosdistro noetic --deps --tar > noetic-desktop.rosinstall
 RUN mkdir ./src && vcs import --input noetic-desktop.rosinstall ./src
 
-# FIXME: apply patch set from https://github.com/RoboStack/ros-noetic/tree/main/patch
+# Apply patches
+RUN cd src/rosconsole && git apply /patches/ros-noetic/patch/ros-noetic-rosconsole.patch
+RUN cd src/rqt/rqt_gui_cpp && git apply /patches/ros-noetic/patch/ros-noetic-rqt-gui-cpp.patch
 
-RUN ./src/catkin/bin/catkin_make_isolated --install -DCMAKE_BUILD_TYPE=Release
+# RUN find . | grep rqt && sleep 999
+
+# Build
+# RUN ./src/catkin/bin/catkin_make_isolated --install -DCMAKE_BUILD_TYPE=Release
+RUN colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-ignore \
+    qt_gui_cpp \
+    rqt_gui_cpp \
+    urdf_parser_plugin
